@@ -9,7 +9,11 @@
   "scripts": {
     "start": "bun run index.ts",
     "analyze": "bun run index.ts analyze",
-    "commit-help": "bun run index.ts commit-help"
+    "commit-help": "bun run index.ts commit-help",
+    "pr-description": "bun run index.ts pr-description",
+    "release-notes": "bun run index.ts release-notes",
+    "setup": "bun run index.ts setup",
+    "build": "bun build index.ts --outdir=dist --target=bun"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.5",

@@ -55,6 +55,44 @@ class GitService {
     return logs.all;
   }
 
+  async getCurrentBranch(): Promise<string> {
+    const branchSummary = await this.git.branch();
+    return branchSummary.current;
+  }
+
+  async getStagedDiff(): Promise<string> {
+    try {
+      return await this.git.diff(['--staged']);
+    } catch (error) {
+      return '';
+    }
+  }
+
+  async getDiffFromBranch(base: string = 'main'): Promise<string> {
+    try {
+      const currentBranch = await this.getCurrentBranch();
+      return await this.git.diff([`${base}...${currentBranch}`]);
+    } catch (error) {
+      return '';
+    }
+  }
+
+  async getCommitsBetween(from: string, to: string): Promise<CommitInfo[]> {
+    const logs = await this.git.log({
+      from,
+      to,
+      format: {
+        hash: '%H',
+        date: '%aI',
+        message: '%s',
+        author_name: '%an',
+        author_email: '%ae',
+      }
+    });
+    
+    return logs.all;
+  }
+
   async analyzeCommitPatterns(days: number = 30): Promise<CommitStats> {
     const commits = await this.getCommitHistory(days);
     
