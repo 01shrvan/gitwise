@@ -10,9 +10,6 @@
     "start": "bun run index.ts",
     "analyze": "bun run index.ts analyze",
     "commit-help": "bun run index.ts commit-help",
-    "pr-review": "bun run index.ts pr-review",
-    "code-quality": "bun run index.ts code-quality",
-    "chat": "bun run index.ts chat",
     "setup": "bun run index.ts setup",
     "build": "bun build index.ts --outdir=dist --target=bun"
   },

@@ -1,7 +1,7 @@
-import { env } from "../config/env";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { CommitInfo, CommitStats } from "../types";
+import type { CommitInfo, CommitStats } from "../types";
+import { env } from "../env";
 
 class AIService {
   private google;
@@ -13,13 +13,16 @@ class AIService {
   }
 
   async analyzeCommitHistory(
-    commits: CommitInfo[], 
-    stats: CommitStats, 
+    commits: CommitInfo[],
+    stats: CommitStats,
     repoName: string,
     compact: boolean = false
   ): Promise<string> {
-    const commitSamples = commits.slice(0, 7).map(c => `- ${c.message} (${new Date(c.date).toLocaleDateString()})`).join('\n');
-    
+    const commitSamples = commits
+      .slice(0, 7)
+      .map((c) => `- ${c.message} (${new Date(c.date).toLocaleDateString()})`)
+      .join("\n");
+
     const prompt = `
 You are GitWise, an AI assistant specifically designed to help developers understand their git repositories and improve their workflow. Analyze the following git repository data and provide actionable insights.
 
@@ -29,7 +32,9 @@ You are GitWise, an AI assistant specifically designed to help developers unders
 - Total commits in period: ${stats.total}
 - Most active day: ${stats.mostActiveDay}
 - Most active hour: ${stats.mostActiveHour} (24h format)
-- Commit message length: Avg=${stats.messageLength.avg}, Min=${stats.messageLength.min}, Max=${stats.messageLength.max}
+- Commit message length: Avg=${stats.messageLength.avg}, Min=${
+      stats.messageLength.min
+    }, Max=${stats.messageLength.max}
 
 # Commit samples:
 ${commitSamples}
@@ -39,7 +44,11 @@ Based on this data, provide:
 2. ONE specific recommendation to improve the git workflow 
 3. A note about commit message quality and how it could be improved
 
-${compact ? 'Be very concise with just 1-2 sentences per point. Keep the entire response under 10 lines.' : 'Be conversational but focused - like a helpful senior developer giving advice.'}
+${
+  compact
+    ? "Be very concise with just 1-2 sentences per point. Keep the entire response under 10 lines."
+    : "Be conversational but focused - like a helpful senior developer giving advice."
+}
 `;
 
     const result = await generateText({
@@ -52,13 +61,23 @@ ${compact ? 'Be very concise with just 1-2 sentences per point. Keep the entire 
     return result.text;
   }
 
-  async improveCommitMessage(draftMessage: string, diff: string = ""): Promise<string> {
+  async improveCommitMessage(
+    draftMessage: string,
+    diff: string = ""
+  ): Promise<string> {
     const prompt = `
 You are GitWise, an AI assistant for git workflows. Improve this commit message to follow best practices.
 
 Draft commit message: "${draftMessage}"
 
-${diff ? `Here's the code diff to provide context:\n\`\`\`\n${diff.substring(0, 2000)}\n${diff.length > 2000 ? '... (diff truncated)' : ''}\`\`\`` : ""}
+${
+  diff
+    ? `Here's the code diff to provide context:\n\`\`\`\n${diff.substring(
+        0,
+        2000
+      )}\n${diff.length > 2000 ? "... (diff truncated)" : ""}\`\`\``
+    : ""
+}
 
 Transform this into a clear, descriptive commit message following these git best practices:
 - Start with a concise summary (50 chars or less)
@@ -79,7 +98,11 @@ Return ONLY the improved commit message without explanations.
     return result.text;
   }
 
-  async generatePRDescription(diff: string, currentBranch: string, baseBranch: string): Promise<string> {
+  async generatePRDescription(
+    diff: string,
+    currentBranch: string,
+    baseBranch: string
+  ): Promise<string> {
     const prompt = `
 You are GitWise, an AI assistant that helps developers create high-quality PR descriptions. Based on the provided diff, generate a comprehensive PR description.
 
@@ -89,7 +112,7 @@ Branch information:
 
 Here's the diff (changes):
 \`\`\`
-${diff.substring(0, 4000)} ${diff.length > 4000 ? '... (diff truncated)' : ''}
+${diff.substring(0, 4000)} ${diff.length > 4000 ? "... (diff truncated)" : ""}
 \`\`\`
 
 Generate a professional PR description with:
@@ -112,8 +135,10 @@ Format this as a proper markdown document that a developer can immediately use.
   }
 
   async generateReleaseNotes(commits: CommitInfo[]): Promise<string> {
-    const commitStr = commits.map(c => `- ${c.hash.substring(0, 7)}: ${c.message}`).join('\n');
-    
+    const commitStr = commits
+      .map((c) => `- ${c.hash.substring(0, 7)}: ${c.message}`)
+      .join("\n");
+
     const prompt = `
 You are GitWise, an AI assistant that helps create professional release notes. Based on these commits, create organized and user-friendly release notes.
 

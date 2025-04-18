@@ -64,7 +64,7 @@ class GitService {
         ...status.modified,
         ...status.created,
         ...status.deleted,
-        ...status.renamed.map(file => file.path),
+        ...status.renamed.map((file) => file.path),
       ];
     } catch (error) {
       return [];
@@ -101,7 +101,9 @@ class GitService {
         });
         return logs.all;
       } else if (validTo) {
-        console.log(`Reference '${from}' not found. Using recent commits instead.`);
+        console.log(
+          `Reference '${from}' not found. Using recent commits instead.`
+        );
         return (await this.git.log({ maxCount: 10 })).all;
       } else {
         console.log(`Invalid references. Using most recent commit.`);
@@ -133,8 +135,16 @@ class GitService {
     let maxLength = 0;
 
     // Initialize days of week
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    days.forEach(day => commitsByDay[day] = 0);
+    const weekdays = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
+    weekdays.forEach((day) => (commitsByDay[day] = 0));
 
     // Initialize hours
     for (let hour = 0; hour < 24; hour++) {
@@ -158,7 +168,7 @@ class GitService {
     });
 
     // Find most active day and hour
-    let mostActiveDay = days[0];
+    let mostActiveDay = weekdays[0];
     let mostActiveHour = "0";
 
     for (const day in commitsByDay) {
@@ -180,7 +190,9 @@ class GitService {
       messageLength: {
         min: minLength === Infinity ? 0 : minLength,
         max: maxLength,
-        avg: commits.length ? Math.round(totalMessageLength / commits.length) : 0,
+        avg: commits.length
+          ? Math.round(totalMessageLength / commits.length)
+          : 0,
       },
       mostActiveDay,
       mostActiveHour,
