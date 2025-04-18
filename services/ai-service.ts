@@ -1,7 +1,7 @@
-import { env } from "../env";
+import { env } from "../config/env";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
-import type { CommitInfo, CommitStats } from "./git-service";
+import { CommitInfo, CommitStats } from "../types";
 
 class AIService {
   private google;
@@ -21,7 +21,9 @@ class AIService {
     const commitSamples = commits.slice(0, 7).map(c => `- ${c.message} (${new Date(c.date).toLocaleDateString()})`).join('\n');
     
     const prompt = `
-As a git expert called GitWise, analyze the following commit history and statistics from the "${repoName}" repository.
+You are GitWise, an AI assistant specifically designed to help developers understand their git repositories and improve their workflow. Analyze the following git repository data and provide actionable insights.
+
+# Repository: "${repoName}"
 
 # Commit Statistics:
 - Total commits in period: ${stats.total}
@@ -33,19 +35,18 @@ As a git expert called GitWise, analyze the following commit history and statist
 ${commitSamples}
 
 Based on this data, provide:
-1. A brief summary of the commit patterns
-2. Insights about productivity patterns (time of day, day of week)
-3. Feedback on commit message quality and consistency
-4. Tips for improving git workflow based on what you see
+1. The most important insight about this repository's commit patterns
+2. ONE specific recommendation to improve the git workflow 
+3. A note about commit message quality and how it could be improved
 
-${compact ? 'Present this in a very concise format with bullet points only. Keep the entire response under 15 lines total.' : 'Present this in a friendly, helpful tone with clear sections.'}
+${compact ? 'Be very concise with just 1-2 sentences per point. Keep the entire response under 10 lines.' : 'Be conversational but focused - like a helpful senior developer giving advice.'}
 `;
 
     const result = await generateText({
       model: this.google("gemini-1.5-flash-latest"),
       prompt,
       temperature: 0.7,
-      maxTokens: compact ? 500 : 1000,
+      maxTokens: compact ? 300 : 800,
     });
 
     return result.text;
@@ -53,20 +54,19 @@ ${compact ? 'Present this in a very concise format with bullet points only. Keep
 
   async improveCommitMessage(draftMessage: string, diff: string = ""): Promise<string> {
     const prompt = `
-As GitWise, I'm an expert at crafting clear, descriptive git commit messages.
+You are GitWise, an AI assistant for git workflows. Improve this commit message to follow best practices.
 
 Draft commit message: "${draftMessage}"
 
-${diff ? `Here's the code diff to provide context:\n\`\`\`\n${diff}\n\`\`\`` : ""}
+${diff ? `Here's the code diff to provide context:\n\`\`\`\n${diff.substring(0, 2000)}\n${diff.length > 2000 ? '... (diff truncated)' : ''}\`\`\`` : ""}
 
-Please improve this commit message following these git best practices:
+Transform this into a clear, descriptive commit message following these git best practices:
 - Start with a concise summary (50 chars or less)
 - Use imperative mood ("Add feature" not "Added feature")
-- Provide context about why the change is being made
-- Break down complex changes into multiple bullet points if needed
-- Keep it focused on what changed and why, not how
+- Be specific about what changed
+- Reference issue numbers if present in the original
 
-Return ONLY the improved commit message without explanations or bullet points.
+Return ONLY the improved commit message without explanations.
 `;
 
     const result = await generateText({
@@ -81,65 +81,85 @@ Return ONLY the improved commit message without explanations or bullet points.
 
   async generatePRDescription(diff: string, currentBranch: string, baseBranch: string): Promise<string> {
     const prompt = `
-As GitWise, I'll help you generate a professional pull request description.
+You are GitWise, an AI assistant that helps developers create high-quality PR descriptions. Based on the provided diff, generate a comprehensive PR description.
 
-I'm looking at changes from branch '${currentBranch}' to be merged into '${baseBranch}'.
+Branch information:
+- Source branch: '${currentBranch}'
+- Target branch: '${baseBranch}'
 
-Here's the diff of the changes:
+Here's the diff (changes):
 \`\`\`
-${diff.substring(0, 5000)} ${diff.length > 5000 ? '... (diff truncated)' : ''}
+${diff.substring(0, 4000)} ${diff.length > 4000 ? '... (diff truncated)' : ''}
 \`\`\`
 
-Generate a comprehensive PR description including:
-1. A clear title summarizing the main purpose of these changes
-2. A detailed description of what was changed
-3. The reason/motivation for these changes
-4. Any important implementation details developers should know
-5. Instructions for testing these changes
-6. Any potential risks or areas of concern
+Generate a professional PR description with:
+1. A clear title (prefixed with "Title: ")
+2. A concise summary of what this PR accomplishes (2-3 sentences)
+3. Key changes (as bullet points)
+4. Testing instructions (simple steps to verify the changes work)
 
-Format this as a proper markdown document ready to paste into a PR description.
+Format this as a proper markdown document that a developer can immediately use.
 `;
 
     const result = await generateText({
       model: this.google("gemini-1.5-flash-latest"),
       prompt,
       temperature: 0.5,
-      maxTokens: 1000,
+      maxTokens: 800,
     });
 
     return result.text;
   }
 
   async generateReleaseNotes(commits: CommitInfo[]): Promise<string> {
-    // Group commits by type (feature, fix, docs, etc.)
     const commitStr = commits.map(c => `- ${c.hash.substring(0, 7)}: ${c.message}`).join('\n');
     
     const prompt = `
-As GitWise, I'll help you generate professional release notes.
+You are GitWise, an AI assistant that helps create professional release notes. Based on these commits, create organized and user-friendly release notes.
 
-Here are the commits to include:
+Commits:
 ${commitStr}
 
-Please generate comprehensive release notes with the following:
-1. Group commits by type (features, bug fixes, documentation, etc.)
-2. Highlight major changes first
-3. Use clear, consistent formatting with markdown
-4. Make it user-focused, emphasizing benefits and improvements
-5. Include a brief summary at the top
+Create release notes that:
+1. Group changes by type (Features, Bug Fixes, Documentation, etc.)
+2. Use clear, friendly language that focuses on what users gain
+3. Highlight the most important changes first
+4. Include a brief summary at the top
 
-Format this as a proper markdown document ready to share with users.
+Format as markdown, ready to publish to users.
 `;
 
     const result = await generateText({
       model: this.google("gemini-1.5-flash-latest"),
       prompt,
       temperature: 0.5,
-      maxTokens: 1000,
+      maxTokens: 800,
+    });
+
+    return result.text;
+  }
+
+  async answerRepoQuestion(question: string, repoInfo: any): Promise<string> {
+    const prompt = `
+You are GitWise, an AI assistant for git repositories. Answer the following question about a git repository based on the provided information.
+
+Question: "${question}"
+
+Repository information:
+${JSON.stringify(repoInfo, null, 2)}
+
+Provide a helpful, conversational response that directly answers the question. If you don't have enough information to answer the question specifically, say so and suggest what information would be needed.
+`;
+
+    const result = await generateText({
+      model: this.google("gemini-1.5-flash-latest"),
+      prompt,
+      temperature: 0.5,
+      maxTokens: 500,
     });
 
     return result.text;
   }
 }
 
-export const aiService = new AIService();
+export const createAIService = () => new AIService();

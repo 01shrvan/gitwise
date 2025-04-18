@@ -1,31 +1,14 @@
 import simpleGit, { SimpleGit } from "simple-git";
-
-export interface CommitInfo {
-  hash: string;
-  date: string;
-  message: string;
-  author_name: string;
-  author_email: string;
-}
-
-export interface CommitStats {
-  total: number;
-  commitsByDay: Record<string, number>;
-  commitsByHour: Record<string, number>;
-  messageLength: {
-    min: number;
-    max: number;
-    avg: number;
-  };
-  mostActiveDay: string;
-  mostActiveHour: string;
-}
+import path from "path";
+import { CommitInfo, CommitStats, RepoInfo } from "../types";
 
 class GitService {
   private git: SimpleGit;
+  private repoPath: string;
 
-  constructor(path: string = ".") {
-    this.git = simpleGit(path);
+  constructor(repoPath: string = ".") {
+    this.repoPath = path.resolve(repoPath);
+    this.git = simpleGit(this.repoPath);
   }
 
   async isGitRepo(): Promise<boolean> {
@@ -38,7 +21,6 @@ class GitService {
   }
 
   async getCommitHistory(days: number = 30): Promise<CommitInfo[]> {
-    // Use git-friendly date format
     const logs = await this.git.log({
       "--after": `${days} days ago`,
       format: {
@@ -75,70 +57,63 @@ class GitService {
     }
   }
 
-  async getCommitsBetween(from: string, to: string): Promise<CommitInfo[]> {
+  async getModifiedFiles(): Promise<string[]> {
     try {
-      // First check if the references exist
-      const validFrom = await this.validateReference(from);
-      const validTo = await this.validateReference(to);
-
-      let range = "";
-
-      if (validFrom && validTo) {
-        // Both references are valid, use the range
-        range = `${from}...${to}`;
-      } else if (validTo) {
-        // Only 'to' is valid, get recent commits instead
-        console.log(
-          `Reference '${from}' not found. Using recent commits instead.`
-        );
-        // Get the last 10 commits or whatever seems reasonable
-        return (await this.git.log({ maxCount: 10 })).all.map((commit) => ({
-          hash: commit.hash,
-          date: commit.date,
-          message: commit.message,
-          author_name: commit.author_name,
-          author_email: commit.author_email,
-        }));
-      } else {
-        // Neither reference is valid, fall back to most recent commit
-        console.log(`Invalid references. Using most recent commit.`);
-        return (await this.git.log({ maxCount: 1 })).all.map((commit) => ({
-          hash: commit.hash,
-          date: commit.date,
-          message: commit.message,
-          author_name: commit.author_name,
-          author_email: commit.author_email,
-        }));
-      }
-
-      const logs = await this.git.log({
-        from,
-        to,
-        format: {
-          hash: "%H",
-          date: "%aI",
-          message: "%s",
-          author_name: "%an",
-          author_email: "%ae",
-        },
-      });
-
-      return logs.all;
+      const status = await this.git.status();
+      return [
+        ...status.modified,
+        ...status.created,
+        ...status.deleted,
+        ...status.renamed.map(file => file.path),
+      ];
     } catch (error) {
-      console.log(`Error getting commits between refs: ${error}`);
-      // Fallback to recent commits
-      const logs = await this.git.log({ maxCount: 5 });
-      return logs.all.map((commit) => ({
-        hash: commit.hash,
-        date: commit.date,
-        message: commit.message,
-        author_name: commit.author_name,
-        author_email: commit.author_email,
-      }));
+      return [];
     }
   }
 
-  // Add this helper method to check if a git reference exists
+  async getFileContent(filePath: string): Promise<string> {
+    try {
+      // Get the absolute path
+      const absolutePath = path.join(this.repoPath, filePath);
+      const content = await this.git.show([`HEAD:${filePath}`]);
+      return content;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  async getCommitsBetween(from: string, to: string): Promise<CommitInfo[]> {
+    try {
+      const validFrom = await this.validateReference(from);
+      const validTo = await this.validateReference(to);
+
+      if (validFrom && validTo) {
+        const logs = await this.git.log({
+          from,
+          to,
+          format: {
+            hash: "%H",
+            date: "%aI",
+            message: "%s",
+            author_name: "%an",
+            author_email: "%ae",
+          },
+        });
+        return logs.all;
+      } else if (validTo) {
+        console.log(`Reference '${from}' not found. Using recent commits instead.`);
+        return (await this.git.log({ maxCount: 10 })).all;
+      } else {
+        console.log(`Invalid references. Using most recent commit.`);
+        return (await this.git.log({ maxCount: 1 })).all;
+      }
+    } catch (error) {
+      console.log(`Error getting commits between refs: ${error}`);
+      const logs = await this.git.log({ maxCount: 5 });
+      return logs.all;
+    }
+  }
+
   async validateReference(ref: string): Promise<boolean> {
     try {
       await this.git.revparse(["--verify", ref]);
@@ -158,17 +133,8 @@ class GitService {
     let maxLength = 0;
 
     // Initialize days of week
-    for (const day of [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ]) {
-      commitsByDay[day] = 0;
-    }
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    days.forEach(day => commitsByDay[day] = 0);
 
     // Initialize hours
     for (let hour = 0; hour < 24; hour++) {
@@ -177,15 +143,7 @@ class GitService {
 
     commits.forEach((commit) => {
       const date = new Date(commit.date);
-      const day = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ][date.getDay()];
+      const day = days[date.getDay()];
       const hour = date.getHours().toString();
 
       // Count commits by day and hour
@@ -200,8 +158,8 @@ class GitService {
     });
 
     // Find most active day and hour
-    let mostActiveDay = Object.keys(commitsByDay)[0];
-    let mostActiveHour = Object.keys(commitsByHour)[0];
+    let mostActiveDay = days[0];
+    let mostActiveHour = "0";
 
     for (const day in commitsByDay) {
       if (commitsByDay[day] > commitsByDay[mostActiveDay]) {
@@ -222,16 +180,14 @@ class GitService {
       messageLength: {
         min: minLength === Infinity ? 0 : minLength,
         max: maxLength,
-        avg: commits.length
-          ? Math.round(totalMessageLength / commits.length)
-          : 0,
+        avg: commits.length ? Math.round(totalMessageLength / commits.length) : 0,
       },
       mostActiveDay,
       mostActiveHour,
     };
   }
 
-  async getRepoInfo(): Promise<{ name: string; branches: number }> {
+  async getRepoInfo(): Promise<RepoInfo> {
     const remote = await this.git.remote(["get-url", "origin"]).catch(() => "");
     const branches = await this.git.branch();
 
@@ -247,8 +203,9 @@ class GitService {
     return {
       name,
       branches: branches.all.length,
+      path: this.repoPath,
     };
   }
 }
 
-export const gitService = (path: string = ".") => new GitService(path);
+export const createGitService = (path: string = ".") => new GitService(path);
