@@ -1,6 +1,6 @@
 {
   "name": "gitwise",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "module": "index.ts",
   "type": "module",
   "bin": {
@@ -10,22 +10,28 @@
     "start": "bun run index.ts",
     "analyze": "bun run index.ts analyze",
     "commit-help": "bun run index.ts commit-help",
-    "pr-description": "bun run index.ts pr-description",
-    "release-notes": "bun run index.ts release-notes",
+    "pr-review": "bun run index.ts pr-review",
+    "code-quality": "bun run index.ts code-quality",
+    "chat": "bun run index.ts chat",
     "setup": "bun run index.ts setup",
     "build": "bun build index.ts --outdir=dist --target=bun"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.5",
+    "@octokit/rest": "^20.0.0",
     "@t3-oss/env-core": "^0.12.0",
     "ai": "^4.2.11",
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
+    "inquirer": "^9.2.10",
+    "open": "^9.1.0",
     "simple-git": "^3.22.0",
+    "terminal-link": "^3.0.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/bun": "^1.2.8"
+    "@types/bun": "^1.2.8",
+    "@types/inquirer": "^9.0.3"
   },
   "peerDependencies": {
     "typescript": "^5"

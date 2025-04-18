@@ -1,6 +1,6 @@
-import simpleGit, { SimpleGit } from "simple-git";
+import simpleGit, { type SimpleGit } from "simple-git";
 import path from "path";
-import { CommitInfo, CommitStats, RepoInfo } from "../types";
+import type { CommitInfo, CommitStats } from "../types";
 
 class GitService {
   private git: SimpleGit;

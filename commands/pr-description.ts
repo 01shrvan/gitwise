@@ -3,7 +3,7 @@ import path from 'path';
 import { createGitService } from '../services/git-service';
 import { createAIService } from '../services/ai-service';
 import { printHeader, formatDuration } from '../services/utils';
-import { PRDescriptionOptions } from '../types';
+import type { PRDescriptionOptions } from '../types';
 
 export async function generatePRDescription(options: PRDescriptionOptions): Promise<void> {
   const startTime = Date.now();
